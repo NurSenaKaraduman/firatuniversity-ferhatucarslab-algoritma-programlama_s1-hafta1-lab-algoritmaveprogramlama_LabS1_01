@@ -1,4 +1,130 @@
-Öğrenci No:
-AD-SOYAD:
+Öğrenci No:250541046
+AD-SOYAD:Nursena Karaduman
 
 Lütfen seçtiğiniz algoritmaya ait çözümü ve diğer isterleri aşağıya ekleyiniz:
+#mükemmel omlet yapma algoritması
+FONKSIYON MukemmelOmletYap(
+    yumurta_sayisi, tuz_gram, tereyag_gram, sut_kasik,
+    dolgular_listesi, kivam, tava_cap_cm
+):
+    # 0) Ön Hazırlık
+    KABUL_ET yumurta_sayisi >= 2
+    HER bir d IN dolgular_listesi İÇİN:
+        GerekirseOnPisir(d)                 # mantar/sucuk gibi sulu dolguları sotele
+    DolgulardakiNemiAl()                    # peçete üzerinde beklet
+
+    # 1) Tazelik ve Oran Kontrolü
+    EĞER YumurtaTazeMi(yumurta_sayisi) DEĞİLSE:
+        YAZ "Uyarı: Yumurta tazeliği düşük → koku/tekstür riski"
+    EĞER sut_kasik > 1 İSE:
+        YAZ "Not: Fazla süt omleti lastikleştirebilir (0–1 kaşık öneri)"
+
+    # 2) Karışımı Hazırla (Çırpma Döngüsü)
+    kase <- TemizKase()
+    KaseyeEkle(kase, yumurta_sayisi, tuz_gram)
+    EĞER sut_kasik > 0 İSE:
+        KaseyeEkle(kase, sut_kasik)
+
+    cirpma_saniye <- 0
+    İKEN KurdeleTestiGecildiMi(kase) DEĞİL:
+        Cırp(kase, 2)                       # 2 sn çırp
+        cirpma_saniye <- cirpma_saniye + 2
+        EĞER cirpma_saniye > 60 İSE:
+            KIR                               # aşırı çırpmayı önle
+    İSTEGE_BAGLI BirazHavaKat(kase)
+
+    # 3) Tava Isıtma ve Sıcaklık Koşulu
+    tava <- TavaSec(tava_cap_cm, yapismayan=true)
+    TavaIsit(tava, orta_ates)
+    bekleme <- 0
+    İKEN TavaHedefSicakliktaMi(tava, 175, 185) DEĞİL:
+        Bekle(5)
+        bekleme <- bekleme + 5
+        EĞER bekleme > 120 İSE:
+            AtesiBirTikArtir(tava)
+        EĞER TavaCokSicak(tava) İSE:
+            AtesiAzalt(tava)
+            BirazSogut(10)
+
+    # 4) Yağlama
+    TereyagiEkle(tava, tereyag_gram)
+    EĞER TereyagiHemenKizariyorMu() İSE:
+        AtesiAzalt(tava)
+    TavayiEgitVeYayi()
+
+    # 5) Dökme ve İlk Pişirme (Koagülasyon Döngüsü)
+    Dök(kase, tava)
+    ZamanlayiciSifirla()
+    TEKRARLA:
+        KenarlariMerkezeCek(tava, spatula="silikon")
+        EgitVeBosluklariDoldur(tava)
+        Bekle(3)
+    TA Kİ YuzeyParlakAmaCoguTutmusOlanaKadar()
+
+    # 6) Dolgular ve Kıvam Kararı
+    EĞER dolgular_listesi BOS DEGIL İSE:
+        DolgulariYarimDaireAlaninaYay(tava)
+
+    EĞER kivam == "yumusak" İSE:
+        hedef_merkez <- "hafif akişkan-parlak"
+    DEĞİLSE EĞER kivam == "orta" İSE:
+        hedef_merkez <- "nemli ama akmayan"
+    DEĞİLSE:
+        hedef_merkez <- "tam pişmiş, mat"
+
+    # 7) Bitirme Döngüsü + Katlama
+    İKEN MerkezHedefeUyuyorMu(hedef_merkez) DEĞİL:
+        DusukAtestePisir(tava, 5)            # 5 sn aralıklarla kontrol
+        EĞER AltKizarmasiArtıyorMu() İSE:
+            AtesiAzalt(tava) VEYA TavayiKaldirKisaSure()
+        EĞER YapismaVarMi(tava) İSE:
+            KenarlaraInceTereyagiGezdir(tava)
+        EĞER AsiriPismeRiski() İSE:
+            GIT KATLA_SIMDI
+
+    ETIKET KATLA_SIMDI:
+    OmletiKatla(tava, stil="yarim ay")       # istersen "üç kat" da olabilir
+    TabagaKaydir()
+
+    # 8) Son Dokunuş ve Hata Toparlama
+    UsteAzTereyagiSür(2)                     # ~2 g
+    KarabiberSerp()
+    EĞER YirtikVarMi() İSE:
+        KasarlaYamaYap()
+    EĞER AsiriPistiMi() İSE:
+        YAZ "Plan B: soft scramble'a çeviriliyor"
+        SoftScrambleaDonustur()
+
+    # 9) Servis ve Geri Bildirim Döngüsü
+    ServisEt()
+    geribildirim <- TadarakPuanla(doku, tuzluluk, nem)
+    DenemeyiKaydet(
+        yumurta=yumurta_sayisi, dolgular=dolgular_listesi, kivam=kivam,
+        tahmini_tava_sicakligi=TahminiTavaSicakligi(), sonuc=geribildirim
+    )
+
+    # 10) Öğrenme — Parametre Güncelle
+    EĞER geribildirim.doku == "kuru" İSE:
+        SonrakiSeferSicaklikVeyaSureAzalt()
+    EĞER geribildirim.tuzluluk == "az" İSE:
+        tuz_gram <- tuz_gram + 0.3
+    EĞER geribildirim.nem == "asiri" İSE:
+        SutuVeyaDolgularinSuyunuAzalt()
+
+    DÖNDÜR geribildirim
+SON FONKSIYON
+
+
+FONKSIYON KurdeleTestiGecildiMi(kase):
+    # Kaşığı kaldırınca karışım ince şerit gibi akıp 1–2 sn iz bırakmalı
+    DÖNDÜR GozleKontrol()
+
+FONKSIYON TavaHedefSicakliktaMi(tava, t_min, t_max):
+    # Su damlası testi: küçük boncuk olup geziniyorsa ~180°C
+    EĞER SuDamlasiDavranisi("boncuk") İSE:
+        tahmin <- 180
+    DEĞİLSE EĞER "aninda buhar + agresif sicrama" İSE:
+        tahmin <- 195
+    DEĞİLSE:
+        tahmin <- 165
+    DÖNDÜR (t_min <= tahmin VE tahmin <= t_max)
