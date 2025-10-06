@@ -1,4 +1,143 @@
-Öğrenci No:
-AD-SOYAD:
+Öğrenci No:250541046
+AD-SOYAD: Nursena Karaduman 
 
+#lego inşa etme algoritması
 Lütfen seçtiğiniz algoritmaya ait çözümü ve diğer isterleri aşağıya ekleyiniz:
+FONKSIYON LegoSekliInsaaEt(
+    hedef_sekil,               # 3B voxel/küp matrisi: hedef_sekil[x][y][z] = 1/0
+    parca_envanteri,           # { "2x4": n, "2x3": n, "2x2": n, "1x2": n, "1x1": n, ... }
+    renk_haritasi,             # (x,y,z) -> renk etiketi (opsiyonel)
+    taban_plaka_boyutu,        # {genislik_stud, uzunluk_stud}
+    guvenlik_esik              # stabilite puanı alt limiti (örn: 0.75)
+):
+    # 0) Başlat / Normalizasyon
+    ASSERT TabanUygunMu(hedef_sekil, taban_plaka_boyutu)
+    hedef_sekil <- TrimBosKatmanlar(hedef_sekil)      # baştaki/sondaki boş z dilimlerini buda
+    Zmax <- KatmanSayisi(hedef_sekil) - 1
+    build_adimlari <- BosListe()
+
+    # 1) Envanter Kontrolü + İkame Planı
+    gerekli_tahmin <- ParcaIhtiyacTahmini(hedef_sekil)         # kaba tahmin
+    EĞER EnvanterYetersiz(parca_envanteri, gerekli_tahmin) İSE:
+        parca_envanteri <- IkameHaritasiOlustur(parca_envanteri)  # 2x4 yoksa 2x2+2x2 vb.
+        LOG("İkame planı etkin")
+
+    # 2) Katmanlara Ayır ve Sırala (alttan üste)
+    Z <- 0
+    ÖNCEKİ_KATMAN_PARCALAR <- BosListe()
+
+    İKEN Z <= Zmax:
+        katman_maskesi <- KatmanCikar(hedef_sekil, Z)        # 2B maske (1: dolu, 0: boş)
+
+        # 2.1) Bağlantı ve içi boşluk kontrolü
+        Bilesenler <- BaglantiBilesenleri(katman_maskesi)    # BFS/DFS
+        HER b IN Bilesenler İÇİN:
+            EĞER IcBoslukVar(b) İSE:
+                b <- IcBosluguDoldur(b)                      # delik düzeltme (opsiyonel)
+
+        # 2.2) Yerleşim Ofseti (örgü sağlamlığı için)
+        ofset <- (Z MOD 2 == 0 ? 0 : 1)                      # tek katmanlarda 1 stud kaydır
+        katman_maskesi <- Kaydir(katman_maskesi, x_ofset=ofset)
+
+        # 2.3) Katmanı Tuğlalarla Döşe (Büyükten Küçüğe Açgözlü)
+        oncelik <- ["2x4","2x3","2x2","1x2","1x1"]
+        katman_parcalari <- BosListe()
+
+        İKEN KaplanmamisHücreVar(katman_maskesi):
+            (x,y) <- IlkBosHücre(katman_maskesi)
+            yerlesti <- FALSE
+            HER tip IN oncelik İÇİN:
+                boyut <- ParcaBoyutu(tip)               # örn 2x4 => (2,4)
+                EĞER ParcaSigiyorMu(katman_maskesi, x,y, boyut) VE EnvanterVar(parca_envanteri, tip):
+                    Place(katman_maskesi, x,y, boyut)
+                    EnvanterAzalt(parca_envanteri, tip, 1)
+                    Ekle(katman_parcalari, YeniParca(tip, x,y, Z, renk_haritasi))
+                    yerlesti <- TRUE
+                    KIR
+            EĞER yerlesti == FALSE:
+                # son çare: 1x1 dene; o da yoksa hata toparla
+                EĞER EnvanterVar(parca_envanteri, "1x1") VE ParcaSigiyorMu(katman_maskesi, x,y,(1,1)):
+                    Place(katman_maskesi, x,y,(1,1))
+                    EnvanterAzalt(parca_envanteri, "1x1", 1)
+                    Ekle(katman_parcalari, YeniParca("1x1", x,y, Z, renk_haritasi))
+                DEĞİLSE:
+                    # İkame: daha büyük parçaları küçük kombinasyonla parçala
+                    basari <- ZorunluIkameYerlesimi(katman_maskesi, x,y, parca_envanteri)
+                    EĞER basari == FALSE:
+                        LOG("Envanter kritik yetersiz; katman kısmi kaldı")
+                        KIR
+
+        # 2.4) Alt Katmanla Örtüşme / Destek Kontrolü
+        HER p IN katman_parcalari İÇİN:
+            EĞER Z > 0 VE DestekYetersiz(p, ÖNCEKİ_KATMAN_PARCALAR):
+                # en az 2 stud destek, dikiş üstüne bağlantı şartı
+                destek_koyuldu <- BaglayiciParcaEkle(p, ÖNCEKİ_KATMAN_PARCALAR, parca_envanteri)
+                EĞER destek_koyuldu == FALSE:
+                    LOG("Destek ikamesi dene")
+                    destek_koyuldu <- DestekIkameEkle(p, parca_envanteri)
+                EĞER destek_koyuldu == FALSE:
+                    LOG("Uyarı: p için destek sağlanamadı")
+
+        # 2.5) Renk Uygulama (opsiyonel)
+        HER p IN katman_parcalari İÇİN:
+            hedef_renk <- RenkGetir(renk_haritasi, p.konumlar)
+            EĞER hedef_renk VAR VE RenkEnvanteriVar(parca_envanteri, p.tip, hedef_renk):
+                p.renk <- hedef_renk
+                RenkEnvanterAzalt(parca_envanteri, p.tip, hedef_renk, 1)
+            DEĞİLSE:
+                p.renk <- EnYakinRenk(parca_envanteri, p.tip)   # ikame renk
+
+        # 2.6) Katman Stabilite Skoru
+        skor <- StabiliteSkoru(katman_parcalari, ÖNCEKİ_KATMAN_PARCALAR)
+        EĞER skor < guvenlik_esik:
+            LOG("Stabilite düşük -> dikiş üstü bağlayıcı ekle")
+            katman_parcalari <- DikisUstuGuclendir(katman_parcalari, ÖNCEKİ_KATMAN_PARCALAR, parca_envanteri)
+
+        # 2.7) Adımları Kaydet
+        Ekle(build_adimlari, {katman=Z, parcalar=katman_parcalari})
+        ÖNCEKİ_KATMAN_PARCALAR <- katman_parcalari
+        Z <- Z + 1
+    SON
+
+    # 3) Son Denetim: Bağlılık / Çakışma / Boyut
+    EĞER NOT TekParcaBagliYapi(build_adimlari):
+        LOG("Parça kümeleri ayrık -> bağlayıcı köprüler ekleniyor")
+        build_adimlari <- KumeKopruleriEkle(build_adimlari, parca_envanteri)
+
+    EĞER ÇakışmaVar(build_adimlari):
+        build_adimlari <- ÇakışmaCöz(build_adimlari)
+
+    # 4) Çıktı: Basım sırasına göre adımlar
+    DÖNDÜR build_adimlari
+SON FONKSIYON
+
+
+# === Yardımcı Rutinler (özet) ===
+
+FONKSIYON TabanUygunMu(hedef_sekil, taban):
+    (gx,gy) <- GerekliTabanBoyutu(hedef_sekil)
+    DÖNDÜR (gx <= taban.genislik_stud VE gy <= taban.uzunluk_stud)
+
+FONKSIYON ParcaSigiyorMu(maske, x,y, boyut):
+    (w,h) <- boyut
+    DÖNDÜR BölgeBosMu(maske, x..x+w-1, y..y+h-1)
+
+FONKSIYON DestekYetersiz(p, alt_parcalar):
+    # en az 2 stud altta bir parçaya oturmalı ve dikiş üstü bindirme olmalı
+    DÖNDÜR (AlttanStudTemasi(p, alt_parcalar) < 2) VEYA NOT DikisUstuBindirme(p, alt_parcalar)
+
+FONKSIYON StabiliteSkoru(katman, alt_katman):
+    # basit skor: (ortalama stud teması + dikiş üstü yüzdesi)/2
+    a <- OrtalamaStudTemasi(katman, alt_katman)
+    b <- DikisUstuYuzde(katman, alt_katman)
+    DÖNDÜR (a_norm(a) + b) / 2
+
+FONKSIYON ZorunluIkameYerlesimi(maske, x,y, envanter):
+    # ör: 2x3 yoksa 1x2 + 1x1 kombinasyonu dene
+    kombinasyonlar <- [[("1x2",1),("1x1",1)], [("1x1",3)]]
+    HER komb IN kombinasyonlar İÇİN:
+        EĞER KombinasyonUygunMu(maske, x,y, komb) VE EnvanterUygunMu(envanter, komb):
+            UygulaKombinasyon(maske, x,y, komb, envanter)
+            DÖNDÜR TRUE
+    DÖNDÜR FALSE
+
