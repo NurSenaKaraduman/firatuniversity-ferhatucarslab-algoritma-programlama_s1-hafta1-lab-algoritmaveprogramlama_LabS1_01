@@ -1,4 +1,161 @@
-Öğrenci No:
-AD-SOYAD:
+Öğrenci No:250541046
+AD-SOYAD:Nursena Karaduman
 
 Lütfen seçtiğiniz algoritmaya ait çözümü ve diğer isterleri aşağıya ekleyiniz:
+#kütüphanede kitap arama sistemi
+FONKSIYON KitapAramaSistemi(
+    kullanici_sorgu,                # serbest metin: "suç ve ceza dostoyevski 2012"
+    filtreler,                      # {yil_araligi, dil, koleksiyon, erisim_tipi: "basili|ebook|sesli", konu_kodu[]}
+    siralama_tercihi,               # "alaka", "yeni_eklenen", "yil_azalan", "yil_artan"
+    sayfa_boyutu,                   # ör: 20
+    sayfa_numarasi                  # 1'den başlar
+):
+    # --- 0) Başlat / Önişleme ---
+    indeks <- YukluTersIndeks()                 # başlık, yazar, konu başlıkları, ISBN, anahtar kelimeler
+    envanter <- CanliEnvanterServisi()          # adet, rafta mı/ödünçte mi, geri_getirme_tarihi
+    durak_kelimeler <- DurakKelimelerTr()
+    tokenizer <- BasitTokenizer()
+
+    # --- 1) Sorgu Normalizasyonu ---
+    q <- Normalize(kullanici_sorgu)             # küçük harf, noktalama temizliği, Unicode düzeltme
+    tokenler <- tokenizer(q) - durak_kelimeler
+    # Yazım düzeltme (koşullu)
+    EĞER YazimHatasiOlasiligiYuksek(tokenler) İSE:
+        aday_dogrular <- YazimDuzeltAdaylari(tokenler)
+        tokenler <- EnIyiYazimAdayi(tokenler, aday_dogrular)   # Levenshtein, frekans skoru
+    # Alan çıkarımı (başlık/yazar/ISBN ipuçları)
+    alan_ipuclari <- AlanEtiketiCikar(tokenler) # {"baslik":["suç","ve","ceza"], "yazar":["dostoyevski"] ...}
+
+    # --- 2) Aday Kümesi Oluşturma (Geniş Arama) ---
+    adaylar <- BosKume()
+    # ISBN varsa doğrudan ekle (kesin eşleşme)
+    EĞER alan_ipuclari.ISBN VAR İSE:
+        adaylar <- adaylar ∪ IndeksteAra(indeks, alan="ISBN", terimler=alan_ipuclari.ISBN)
+
+    # Başlık ve yazar için yakın eşleşme (fuzzy)
+    adaylar <- adaylar ∪ FuzzyAra(indeks, alan="BASLIK", terimler=alan_ipuclari.baslik, esik=0.75)
+    adaylar <- adaylar ∪ FuzzyAra(indeks, alan="YAZAR", terimler=alan_ipuclari.yazar, esik=0.75)
+
+    # Konu başlıkları / anahtar kelime eşleşmesi
+    adaylar <- adaylar ∪ AnahtarKelimeAra(indeks, terimler=tokenler, bool="AND+OR")
+
+    # Aday kümesi boşsa kademeli gevşetme döngüsü
+    gevsetme_seviyesi <- 0
+    İKEN Boyut(adaylar) == 0 VE gevsetme_seviyesi <= 3:
+        EĞER gevsetme_seviyesi == 0: adaylar <- FuzzyAra(indeks, alan="BASLIK", terimler=tokenler, esik=0.65)
+        EĞER gevsetme_seviyesi == 1: adaylar <- AnahtarKelimeAra(indeks, terimler=tokenler, bool="OR")
+        EĞER gevsetme_seviyesi == 2: adaylar <- EşanlamliGenislet(indeks, tokenler)
+        EĞER gevsetme_seviyesi == 3: KIR
+        gevsetme_seviyesi <- gevsetme_seviyesi + 1
+
+    # --- 3) Filtreleme (Koşullu) ---
+    filtrelenmis <- []
+    HER kayit IN adaylar İÇİN:
+        EĞER filtreler.yil_araligi VAR İSE VE NOT YilUyumlu(kayit.yil, filtreler.yil_araligi): DEVAM ET
+        EĞER filtreler.dil VAR İSE VE kayit.dil != filtreler.dil: DEVAM ET
+        EĞER filtreler.koleksiyon VAR İSE VE kayit.koleksiyon != filtreler.koleksiyon: DEVAM ET
+        EĞER filtreler.erisim_tipi VAR İSE VE kayit.erisim_tipi != filtreler.erisim_tipi: DEVAM ET
+        EĞER filtreler.konu_kodu BOS DEGIL İSE VE NOT KapsarMi(kayit.konu_kodlari, filtreler.konu_kodu): DEVAM ET
+        Ekle(filtrelenmis, kayit)
+    SON
+
+    # --- 4) Canlı Uygunluk Verisi ile Zenginleştirme ---
+    HER k IN filtrelenmis İÇİN:
+        stok <- envanter.Sorgula(k.barkod || k.ISBN)
+        k.mevcut_kopya <- stok.adet_rafta
+        k.oduncte_adet <- stok.adet_oduncte
+        k.en_yakin_iade <- stok.en_yakin_iade_tarihi
+
+    # --- 5) Skorlama ve Sıralama ---
+    HER k IN filtrelenmis İÇİN:
+        k.alaka_skoru <- BM25(tokenler, k) + AlanAgirlikBonus(k, alan_ipuclari)
+        k.taze_bonus <- TarihceBonus(k.eklenme_tarihi)
+        k.kullanim_pop <- OduncAlinmaFrekansi(k)
+        k.uygunluk_bonus <- (k.mevcut_kopya > 0 ? 0.2 : 0) + (k.en_yakin_iade VAR ? 0.05 : 0)
+        k.toplam_skor <- k.alaka_skoru + 0.3*k.taze_bonus + 0.2*k.kullanim_pop + k.uygunluk_bonus
+
+    EĞER siralama_tercihi == "alaka":     SiralaAzalan(filtrelenmis, anahtar=k.toplam_skor)
+    EĞER siralama_tercihi == "yeni_eklenen": SiralaAzalan(filtrelenmis, anahtar=k.eklenme_tarihi)
+    EĞER siralama_tercihi == "yil_azalan":  SiralaAzalan(filtrelenmis, anahtar=k.yil)
+    EĞER siralama_tercihi == "yil_artan":   SiralaArtan(filtrelenmis,  anahtar=k.yil)
+
+    # --- 6) Sayfalama (Döngü) ---
+    toplam_kayit <- Boyut(filtrelenmis)
+    bas_ind <- (sayfa_numarasi - 1) * sayfa_boyutu
+    bit_ind <- Min(bas_ind + sayfa_boyutu, toplam_kayit)
+    sayfa <- []
+    i <- bas_ind
+    İKEN i < bit_ind:
+        Ekle(sayfa, filtrelenmis[i])
+        i <- i + 1
+
+    # --- 7) Sonuç Durumuna Göre Öneriler (Koşullu) ---
+    EĞER Boyut(sayfa) == 0:
+        # Tamamen boşsa: öneriler ve yazım alternatifleri üret
+        alternatifler <- SorguOner(tokenler)           # "kast" -> "kasıt", "dostoyevski" -> "dostoyevsky"
+        konu_onerileri <- PopulerKonuEtiketleri(indeks, tokenler)
+        DÖNDÜR {sonuclar=[], toplam=0, sayfa_numarasi, alternatifler, konu_onerileri}
+    DEĞİLSE:
+        DÖNDÜR {sonuclar=sayfa, toplam=toplam_kayit, sayfa_numarasi, alternatifler=NULL, konu_onerileri=NULL}
+
+SON FONKSIYON
+
+
+# === Yardımcı Rutinler ===
+
+FONKSIYON Normalize(metin):
+    metin <- ToLowerTR(metin)
+    metin <- UnicodeNormalize(metin)             # ı-i, ğ-g, ş-s dikkat
+    metin <- TrimPunct(metin)
+    DÖNDÜR metin
+
+FONKSIYON AlanEtiketiCikar(tokenler):
+    # "isbn:...", "yazar:", "başlık:", "konu:" gibi ipuçlarını ayıkla.
+    etiketler <- {baslik:[], yazar:[], ISBN:[], konu:[]}
+    HER t IN tokenler İÇİN:
+        EĞER Prefix(t,"isbn:"): Ekle(etiketler.ISBN, TemizlePrefix(t,"isbn:"))
+        EĞER Prefix(t,"yazar:"): Ekle(etiketler.yazar, TemizlePrefix(t,"yazar:"))
+        EĞER Prefix(t,"başlık:") VEYA Prefix(t,"baslik:"): Ekle(etiketler.baslik, TemizlePrefix(t,"baslik:"))
+        EĞER Prefix(t,"konu:"): Ekle(etiketler.konu, TemizlePrefix(t,"konu:"))
+    # ipucu yoksa, tüm tokenleri hem başlık hem yazar alanı için aday say
+    EĞER HepsiBos(etiketler):
+        etiketler.baslik <- tokenler
+        etiketler.yazar <- tokenler
+    DÖNDÜR etiketler
+
+FONKSIYON YilUyumlu(yil, aralik):
+    DÖNDÜR (aralik.min <= yil VE yil <= aralik.max)
+
+FONKSIYON AlanAgirlikBonus(kayit, ipucu):
+    bonus <- 0
+    EĞER Kesisim(kayit.baslik_token, ipucu.baslik) VAR: bonus <- bonus + 0.3
+    EĞER Kesisim(kayit.yazar_token,  ipucu.yazar)  VAR: bonus <- bonus + 0.3
+    EĞER ipucu.ISBN VAR VE kayit.ISBN EŞIT ipucu.ISBN: bonus <- bonus + 0.8
+    DÖNDÜR bonus
+
+FONKSIYON SorguOner(tokenler):
+    # Yazım düzeltme + benzer konu başlıkları öner
+    aday <- []
+    HER t IN tokenler İÇİN:
+        Ekle(aday, EnYakınSozcuk(t))            # Levenshtein/Trigram sözlük
+    DÖNDÜR Benzersiz(aday)[0..5]
+
+FONKSIYON LikitRezerveEt(kullanici, kitap_id):
+    # Rezervasyon akışı: mevcut değilse sıraya yaz
+    stok <- CanliEnvanterServisi().Sorgula(kitap_id)
+    EĞER stok.adet_rafta > 0:
+        Ayirt(kullanici, kitap_id, son_teslim_suresi=24_saat)
+        DÖNDÜR "hazir_raf_teslim"
+    DEĞİLSE:
+        SırayaEkle(kullanici, kitap_id)
+        DÖNDÜR "bekleme_listesi"
+
+FONKSIYON HataToparlama():
+    # Bağlantı/time-out gibi hatalarda deneme döngüsü
+    deneme <- 0
+    MAX_DENEME <- 3
+    İKEN deneme < MAX_DENEME:
+        EĞER ServisSaglikliMi(): DÖNDÜR "OK"
+        Bekle(2^deneme)          # üstel geri çekilme
+        deneme <- deneme + 1
+    DÖNDÜR "HATA"
