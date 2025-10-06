@@ -1,4 +1,111 @@
-Öğrenci No:
-AD-SOYAD:
+Öğrenci No:250541046
+AD-SOYAD:Nursena Karaduman
 
 Lütfen seçtiğiniz algoritmaya ait çözümü ve diğer isterleri aşağıya ekleyiniz:
+#insanların MBTI türlerini hesaplamak  İ-E/N-S/T-F/P-J fonksiyonları üzerinden 2şer soru sorarak bulan algoritma
+
+
+FONKSIYON MBTI_16li_Tip_Bul():
+    # Basit ikili soru akışı; her boyutta 2-3 soru sorup çoğunluğa göre karar verir.
+    # Cevap formatı: "E" (evet) veya "H" (hayır) kabul edilsin.
+
+    # === Yardımcı ===
+    FONKSIYON SorYesNo(soru_metin):
+        YAZ soru_metin, " (E/H): "
+        cevap <- KULLANICIDAN_AL()
+        EĞER cevap == "E" VEYA cevap == "e": DÖNDÜR TRUE
+        DEĞİLSE: DÖNDÜR FALSE
+
+    FONKSIYON KararVer(pozitif_sayac, negatif_sayac, pozitif_harf, negatif_harf):
+        EĞER pozitif_sayac > negatif_sayac: DÖNDÜR pozitif_harf
+        EĞER negatif_sayac > pozitif_sayac: DÖNDÜR negatif_harf
+        # Berabere ise son bir ek soru sor
+        YAZ "Beraberlik var, bir soru daha sorulacak..."
+        # Nötr ek soruya E=pozitif, H=negatif olarak puan verelim
+        EĞER SorYesNo("Beraberlik kırıcı soru: kendini daha çok "+pozitif_harf+" gibi mi hissedersin?"):
+            DÖNDÜR pozitif_harf
+        DEĞİLSE:
+            DÖNDÜR negatif_harf
+
+    # === 1) E / I ===
+    e_say = 0; i_say = 0
+    EĞER SorYesNo("Kalabalık bir etkinlikten sonra enerjin artar mı?"): e_say <- e_say + 1
+    DEĞİLSE: i_say <- i_say + 1
+
+    EĞER SorYesNo("Yeni insanlarla tanışmak seni heyecanlandırır mı?"): e_say <- e_say + 1
+    DEĞİLSE: i_say <- i_say + 1
+
+    # Marj kontrolü: gerekirse üçüncü soru
+    EĞER |e_say - i_say| < 2:
+        EĞER SorYesNo("Uzun bir günün sonunda yalnız kalarak mı daha iyi toparlanırsın? (E=evet → I)"):
+            i_say <- i_say + 1
+        DEĞİLSE:
+            e_say <- e_say + 1
+
+    EI <- KararVer(e_say, i_say, "E", "I")
+
+    # === 2) S / N ===
+    s_say = 0; n_say = 0
+    EĞER SorYesNo("Somut detaylar ve gerçeklerle çalışmayı tercih eder misin? (E=evet → S)"):
+        s_say <- s_say + 1
+    DEĞİLSE:
+        n_say <- n_say + 1
+
+    EĞER SorYesNo("Fikirlerin olası gelecek etkilerini hayal etmeyi sever misin? (E=evet → N)"):
+        n_say <- n_say + 1
+    DEĞİLSE:
+        s_say <- s_say + 1
+
+    EĞER |s_say - n_say| < 2:
+        EĞER SorYesNo("Görevlerde talimatlara harfiyen uymayı mı seversin? (E=evet → S)"):
+            s_say <- s_say + 1
+        DEĞİLSE:
+            n_say <- n_say + 1
+
+    SN <- KararVer(s_say, n_say, "S", "N")
+
+    # === 3) T / F ===
+    t_say = 0; f_say = 0
+    EĞER SorYesNo("Karar alırken öncelikle mantık ve tutarlılığa bakar mısın? (E=evet → T)"):
+        t_say <- t_say + 1
+    DEĞİLSE:
+        f_say <- f_say + 1
+
+    EĞER SorYesNo("Kararlarda insanların duygusal etkisini daha çok önemser misin? (E=evet → F)"):
+        f_say <- f_say + 1
+    DEĞİLSE:
+        t_say <- t_say + 1
+
+    EĞER |t_say - f_say| < 2:
+        EĞER SorYesNo("Bir tartışmada doğru olmak, gönül almaktan daha mı önemlidir? (E=evet → T)"):
+            t_say <- t_say + 1
+        DEĞİLSE:
+            f_say <- f_say + 1
+
+    TF <- KararVer(t_say, f_say, "T", "F")
+
+    # === 4) J / P ===
+    j_say = 0; p_say = 0
+    EĞER SorYesNo("Planlı ilerlemek ve işleri bitirme listesiyle çalışmak seni rahatlatır mı? (E=evet → J)"):
+        j_say <- j_say + 1
+    DEĞİLSE:
+        p_say <- p_say + 1
+
+    EĞER SorYesNo("Esnek kalıp seçenekleri açık tutmayı sever misin? (E=evet → P)"):
+        p_say <- p_say + 1
+    DEĞİLSE:
+        j_say <- j_say + 1
+
+    EĞER |j_say - p_say| < 2:
+        EĞER SorYesNo("Takvimine göre yaşamak mı, akışa göre yaşamak mı? (E=takvime göre → J)"):
+            j_say <- j_say + 1
+        DEĞİLSE:
+            p_say <- p_say + 1
+
+    JP <- KararVer(j_say, p_say, "J", "P")
+
+    # === Sonuç ===
+    tip <- EI + SN + TF + JP
+    YAZ "MBTI Tipin: ", tip
+    DÖNDÜR tip
+SON FONKSIYON
