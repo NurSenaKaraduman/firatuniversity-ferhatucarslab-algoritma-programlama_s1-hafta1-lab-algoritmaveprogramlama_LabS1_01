@@ -1,4 +1,168 @@
-Öğrenci No:
-AD-SOYAD:
+Öğrenci No:250541046
+AD-SOYAD:Nursena Karaduman
 
 Lütfen seçtiğiniz algoritmaya ait çözümü ve diğer isterleri aşağıya ekleyiniz:
+#monopolyde en iyi hamle seçimi
+FONKSIYON EnIyiHamleyiSec(
+    benim, tahta, rakipler, oyun_durumu
+):
+    # Girdiler:
+    # benim: {nakit, konum, sahiplik[], evler_oteller, hapiste_mi, kartlar{HapistenCıkış}, ipotekli_mi[]}
+    # tahta: {kareler[0..39], renk_grupları, kira_tabloları, satın_alma_maliyetleri, ev_sayısı_bankada, otel_sayısı_bankada}
+    # rakipler: her biri {nakit, konum, sahiplik[], evler_oteller, hapiste_mi}
+    # oyun_durumu: {tur_no, acik_arttirma_kurali=true/false, N_SIM=200, RISK_HORIZON_TUR=6}
+
+    # 0) Isı haritasını güncelle (iniyatif ve zindandan çıkış etkisi dahil)
+    isi_haritasi <- GuncelleIsiHaritasi(tahta, rakipler, oyun_durumu)
+
+    # 1) Eğer hapisteysem en iyi çıkış yolunu seç
+    EĞER benim.hapiste_mi İSE:
+        hamle_hapis <- SecHapisStratejisi(benim, oyun_durumu)
+        EĞER hamle_hapis == "KART":
+            KullanKart(benim, "HapistenCıkış")
+        EĞER hamle_hapis == "50ODE":
+            ParaOde(benim, 50)
+        # "ZAR_AT" ise hiçbir şey yapma, zar fazına geç
+    SON
+
+    # 2) Likidite kontrolü – olası kira riskine göre nakit tamponu ayarla
+    risk_beklenen <- TahminiKiraRiski(benim, rakipler, tahta, isi_haritasi, oyun_durumu.RISK_HORIZON_TUR)
+    hedef_tampon <- Maks(150, 0.6 * risk_beklenen)
+    EĞER benim.nakit < hedef_tampon İSE:
+        LikiditeArtirRutini(benim, tahta)    # düşük ısıdaki arsaları ipotekle, evleri eşit dağıtım kuralıyla sat
+
+    # 3) Aday hamleleri oluştur (zar atmadan önce yapılabilenler)
+    adaylar <- BosListe()
+    Ekle(adaylar, "PAS")
+    Ekle(adaylar, "INSA_ET")            # ev/otel inşa et (mümkünse)
+    Ekle(adaylar, "REHIN_AC")           # ipotek açma
+    Ekle(adaylar, "REHINLE")            # ipotek koyma
+    Ekle(adaylar, "TAKAS_ONER")         # tekelleri tamamlama amaçlı
+    EĞER BenimMonopolimVar(benim) VE tahta.ev_sayısı_bankada > 0:
+        Ekle(adaylar, "AGRESIF_INSA")
+
+    # 4) Her aday hamleyi simüle ederek skorla
+    en_iyi <- {hamle="PAS", skor=-sonsuz}
+    HER hamle IN adaylar İÇİN:
+        durum_kopya <- Kopyala(benim, tahta, rakipler, oyun_durumu)
+        UygulaHamleOncesi(durum_kopya, hamle)     # (inşa, ipotek, vb.)
+        skor <- DegerlendirDurum(durum_kopya, isi_haritasi, oyun_durumu)
+        EĞER skor > en_iyi.skor İSE:
+            en_iyi <- {hamle=hamle, skor=skor}
+    SON
+
+    # 5) En iyi hamleyi uygula
+    UygulaHamleOncesi({benim, tahta, rakipler, oyun_durumu}, en_iyi.hamle)
+
+    # 6) Zar at ve ilerle
+    zar <- ZarAtIkiAdet()
+    YeniKonumaGit(benim, zar.toplam, tahta)
+
+    # 7) Kare çözümleme (koşullu durumlar)
+    kare <- tahta.kareler[benim.konum]
+    EĞER kare.tipi == "MULK" VE SahipsizMi(kare):
+        # Satın alma kararını beklenen değerle ver
+        EV_skor <- MulkSatınAlmaEV(kare, benim, tahta, isi_haritasi, oyun_durumu)
+        EĞER EV_skor > 0:
+            SatinAl(benim, kare)
+        DEĞİLSE:
+            EĞER oyun_durumu.acik_arttirma_kurali:
+                ArtirmaStratejisi(kare, benim, rakipler, EV_skor)
+    EĞER kare.tipi == "MULK" VE SahibiRakipMi(kare, rakipler):
+        kira <- HesaplaKira(kare)
+        EĞER benim.nakit >= kira:
+            ParaOde(benim, kira)
+        DEĞİLSE:
+            LikiditeArtirRutini(benim, tahta)
+            EĞER benim.nakit < kira:
+                IFLAS_ET(benim, kare.sahibi)
+            DEĞİLSE:
+                ParaOde(benim, kira)
+    EĞER kare.tipi == "VERGI":
+        VergiOde(benim, kare.tutar)
+    EĞER kare.tipi == "SANS" VEYA kare.tipi == "KAMU_FON":
+        KartiCekVeUygula(benim, tahta, rakipler)
+
+    # 8) Tur sonu optimizasyon döngüsü (ev inşa/sök – ev kıtlığı kontrolü)
+    EĞER BenimMonopolimVar(benim):
+        İKEN BütçeVeEvStokUygunMu(benim, tahta):
+            hedef_arsa <- EnYuksekMarjliEvYeri(benim, tahta, isi_haritasi)
+            EĞER hedef_arsa VAR İSE:
+                InsaatYapDengeKuralinaUygun(benim, hedef_arsa)
+            DEĞİLSE:
+                KIR
+
+    DÖNDÜR en_iyi.hamle
+SON FONKSIYON
+
+
+# === Alt Rutinler ===
+
+FONKSIYON GuncelleIsiHaritasi(tahta, rakipler, oyun_durumu):
+    # Basit: önceden bilinen istatistiklere + son turların inişlerine EMA uygula
+    isi[0..39] <- VarsayilanMonopolyIsilari()    # turuncu-kırmızı gruplar yüksek
+    isi <- EMA_Guncelle(isi, SonTurInisleri(rakipler, oyun_durumu), alfa=0.2)
+    DÖNDÜR Normalize(isi)
+
+FONKSIYON SecHapisStratejisi(benim, oyun_durumu):
+    # Üç seçenek: KART, 50ODE, ZAR_AT
+    EV_zar <- SimuleEt(benim, "ZAR_AT", N=oyun_durumu.N_SIM)
+    EV_ode <- SimuleEt(benim, "50ODE", N=oyun_durumu.N_SIM) - 50
+    EV_kart <- SimuleEt(benim, "KART", N=oyun_durumu.N_SIM) - KartFırsatMaliyeti(benim)
+    ENBUYUK <- Argmax({("ZAR_AT", EV_zar), ("50ODE", EV_ode), ("KART", EV_kart)})
+    DÖNDÜR ENBUYUK.etiket
+
+FONKSIYON LikiditeArtirRutini(benim, tahta):
+    # 1) En az sıcak/kıymetsiz mülkleri İPOTEKLE (ısı düşük + tekeli yok)
+    SIRALA mulkler <- BenimMulklerimSiralı(benim, tahta, anahtar=isi_dusuk->yuksek, tekelsiz_once=true)
+    HER m IN mulkler İÇİN:
+        EĞER benim.nakit >= HedefTampon(): KIR
+        EĞER m.ipotekli DEĞİL İSE VE EvSayisi(m) == 0:
+            IpotekKoy(benim, m)
+    # 2) Evleri sat (eşit dağıtım kuralı)
+    HER renk IN BenimMonopollerim(benim) İÇİN:
+        İKEN benim.nakit < HedefTampon() VE ToplamEv(renk) > 0:
+            m <- EnDusukMarjliEvYeriRenkIcinde(renk)
+            Evsat(benim, m)   # bankaya yarı fiyatına
+    DÖNDÜR
+
+FONKSIYON DegerlendirDurum(durum, isi_haritasi, oyun_durumu):
+    # Beklenen nakit akımı - iflas riski - rakip güçlenmesi + tekel/ev bonusları
+    gelir <- BeklenenKiraGelirim(durum.benim, isi_haritasi, oyun_durumu.RISK_HORIZON_TUR)
+    gider <- BeklenenKiraGiderim(durum.benim, durum.rakipler, isi_haritasi, oyun_durumu.RISK_HORIZON_TUR)
+    tekel_bonus <- 0
+    HER renk IN BenimMonopollerim(durum.benim) İÇİN:
+        tekel_bonus <- tekel_bonus + 100 * (1 + OrtalamaIsı(renk, isi_haritasi))
+    ev_kıtlık_bonus <- (BankadakiEvAz(tahta) ? 80 : 0)
+    iflas_riski <- IflasOlasiligiTahmin(durum, oyun_durumu.RISK_HORIZON_TUR)
+    rakip_gucu_ceza <- RakipMonopolTamamlamaCezasi(durum)
+
+    skor <- gelir - gider + tekel_bonus + ev_kıtlık_bonus - 300*iflas_riski - rakip_gucu_ceza
+    # Likidite cezası: tampon altındaysan eksi puan
+    tampon <- HedefTampon()
+    EĞER durum.benim.nakit < tampon:
+        skor <- skor - (tampon - durum.benim.nakit) * 0.8
+    DÖNDÜR skor
+
+FONKSIYON MulkSatınAlmaEV(kare, benim, tahta, isi, oyun_durumu):
+    # Basit EV: (ısı * beklenen kira) - maliyet + tekel_tamamlama_bonusu - likidite_cezası
+    beklenen_kira <- OrtalamaKira(kare, seviyeler=0..4, olasi_insa=YakınGelecekPlanı())
+    tekel_bonusu <- (TamSete1ParcaUzaklik(benim, kare) ? 120 : 0)
+    likidite_cezasi <- Maks(0, HedefTampon() - (benim.nakit - kare.fiyat)) * 0.6
+    DÖNDÜR isi[kare.indeks] * beklenen_kira - kare.fiyat + tekel_bonusu - likidite_cezasi
+
+FONKSIYON ArtirmaStratejisi(kare, benim, rakipler, EV_skor):
+    # Basit kural: kendi EV_skor'unun %70'i kadar tavan belirle; rakip tekel tamamlıyorsa agresif artır
+    tavan <- Maks(0, EV_skor * 0.7 + (RakipIcinTekelTamamlama(kare, rakipler) ? 150 : 0))
+    AcikArtirmayaKatil(benim, kare, tavan)
+
+FONKSIYON EnYuksekMarjliEvYeri(benim, tahta, isi):
+    # Renk setlerimde, (kira_artis * ort_isi) / ev_maliyeti en yüksek olan arsa
+    en <- {arsa=NULL, marj=-sonsuz}
+    HER renk IN BenimMonopollerim(benim) İÇİN:
+        HER arsa IN Arsalar(renk) İÇİN:
+            EĞER EvEklemeMümkünMu(arsa) İSE:
+                kira_artis <- KiraArtisiEvEkleyince(arsa)
+                marj <- kira_artis * OrtalamaIsı(renk, isi) / EvMaliyeti(renk)
+                EĞER marj > en.marj: en <- {arsa=arsa, marj=marj}
+    DÖNDÜR en.arsa
