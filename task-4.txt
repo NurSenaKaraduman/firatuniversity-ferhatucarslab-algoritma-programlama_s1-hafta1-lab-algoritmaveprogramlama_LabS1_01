@@ -2,6 +2,7 @@
 AD-SOYAD: Nursena Karaduman 
 
 #lego inşa etme algoritması
+#chatgpt tarafından yazıldı
 Lütfen seçtiğiniz algoritmaya ait çözümü ve diğer isterleri aşağıya ekleyiniz:
 FONKSIYON LegoSekliInsaaEt(
     hedef_sekil,               # 3B voxel/küp matrisi: hedef_sekil[x][y][z] = 1/0
