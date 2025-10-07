@@ -2,6 +2,7 @@
 AD-SOYAD:Nursena Karaduman
 
 Lütfen seçtiğiniz algoritmaya ait çözümü ve diğer isterleri aşağıya ekleyiniz:
+#chatgpt tarafından yazıldı
 #mükemmel omlet yapma algoritması
 FONKSIYON MukemmelOmletYap(
     yumurta_sayisi, tuz_gram, tereyag_gram, sut_kasik,
