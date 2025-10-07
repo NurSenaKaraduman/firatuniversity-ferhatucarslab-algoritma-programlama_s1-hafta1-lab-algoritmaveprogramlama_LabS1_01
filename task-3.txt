@@ -2,6 +2,7 @@
 AD-SOYAD:Nursena Karaduman
 
 Lütfen seçtiğiniz algoritmaya ait çözümü ve diğer isterleri aşağıya ekleyiniz:
+#chatgpt tarafından yazıldı
 #kütüphanede kitap arama sistemi
 FONKSIYON KitapAramaSistemi(
     kullanici_sorgu,                # serbest metin: "suç ve ceza dostoyevski 2012"
