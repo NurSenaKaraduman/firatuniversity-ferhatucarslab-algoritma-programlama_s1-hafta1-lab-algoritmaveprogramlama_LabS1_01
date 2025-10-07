@@ -1,8 +1,6 @@
 Öğrenci No:250541046
 AD-SOYAD: Nursena Karaduman 
 
-
-
 Lütfen seçtiğiniz algoritmaya ait çözümü ve diğer isterleri aşağıya ekleyiniz:
 #chatgpt tarafından yazıldı
 #lego inşa etme algoritması
