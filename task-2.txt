@@ -2,6 +2,7 @@
 AD-SOYAD:Nursena Karaduman
 
 Lütfen seçtiğiniz algoritmaya ait çözümü ve diğer isterleri aşağıya ekleyiniz:
+#chatgpt tarafından yazıldı
 #monopolyde en iyi hamle seçimi
 FONKSIYON EnIyiHamleyiSec(
     benim, tahta, rakipler, oyun_durumu
