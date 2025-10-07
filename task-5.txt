@@ -2,6 +2,7 @@
 AD-SOYAD:Nursena Karaduman
 
 Lütfen seçtiğiniz algoritmaya ait çözümü ve diğer isterleri aşağıya ekleyiniz:
+#chatgpt tarafından yazıldı.
 #insanların MBTI türlerini hesaplamak  İ-E/N-S/T-F/P-J fonksiyonları üzerinden 2şer soru sorarak bulan algoritma
 
 
