@@ -1,9 +1,11 @@
 Öğrenci No:250541046
 AD-SOYAD: Nursena Karaduman 
 
-#lego inşa etme algoritması
-#chatgpt tarafından yazıldı
+
+
 Lütfen seçtiğiniz algoritmaya ait çözümü ve diğer isterleri aşağıya ekleyiniz:
+#chatgpt tarafından yazıldı
+#lego inşa etme algoritması
 FONKSIYON LegoSekliInsaaEt(
     hedef_sekil,               # 3B voxel/küp matrisi: hedef_sekil[x][y][z] = 1/0
     parca_envanteri,           # { "2x4": n, "2x3": n, "2x2": n, "1x2": n, "1x1": n, ... }
